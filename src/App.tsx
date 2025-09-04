@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import { createDeepgramService, DeepgramService, TranscriptEvent } from "./services/deepgram";
+import { TranscriptEvent } from "./services/deepgram";
 import { ITranscriptionService } from "./types/ITranscriptionService";
 import { TranscriptionServiceFactory } from "./services/transcription/TranscriptionServiceFactory";
-import { createClaudeService, ClaudeAnalysisService, AnalysisContext, InsightResponse, ClaudeServiceConfig } from "./services/claude";
+import { createClaudeService, ClaudeAnalysisService, AnalysisContext, InsightResponse } from "./services/claude";
 import { configService } from "./services/config";
 import { LegacyInsight } from "./types/events";
 import { StartScreen, RecordingScreen, WaveLoader } from "./components";
@@ -31,10 +31,6 @@ export function App() {
   const [transcript, setTranscript] = useState<string>('');
   const [partialTranscript, setPartialTranscript] = useState<string>('');
   const [insights, setInsights] = useState<Array<LegacyInsight>>([]);
-  const [fullTranscript, setFullTranscript] = useState<string>(''); // Накапливаем полный текст
-  const [showTranscript, setShowTranscript] = useState(false);
-  const [correctedSegments, setCorrectedSegments] = useState<Map<string, string>>(new Map()); // segment_id -> corrected text
-  const [lastCorrectionTime, setLastCorrectionTime] = useState<number>(0);
   // Removed background blur functionality
   
   // mediaRecorderRef удален - больше не нужен
@@ -48,16 +44,7 @@ export function App() {
   // Audio analysis hook
   const { audioLevel, initAudioAnalyser, stopAudioAnalyser } = useAudioAnalyser();
 
-  // Функция для добавления тестовых документов
-  const addSampleDocuments = async () => {
-    // if (!ragServiceRef.current) {
-      console.log('📝 RAG service disabled, skipping sample documents');
-      return;
-    // }
-
-    // RAG system temporarily disabled
-    console.log('✅ RAG system disabled - skipping document loading');
-  };
+  // RAG system temporarily disabled
 
   // Cleanup audio analyser when recording stops
   useEffect(() => {
@@ -267,8 +254,7 @@ export function App() {
             setTranscript(newTranscript);
             setPartialTranscript('');
             
-            // Накапливаем полный транскрипт
-            setFullTranscript(prev => (prev + ' ' + event.text).trim());
+            // Full transcript accumulation removed - not used in current code
             
             console.log('✅ [FINAL] Deepgram final result:', {
               text: event.text,
@@ -536,54 +522,45 @@ export function App() {
 
   // Если это окно данных - показываем интерфейс транскрипции
   if (windowType === 'data') {
-    // Слушаем IPC события для окна данных
-    useEffect(() => {
-      if (window.require) {
-        const { ipcRenderer } = window.require('electron');
-        
-        // Слушаем обновления транскрипта
-        const handleTranscriptUpdate = (event: any, data: any) => {
-          console.log('📝 [DATA WINDOW] Transcript update received:', data);
-          if (data.transcript) setTranscript(data.transcript);
-          if (data.partialTranscript) setPartialTranscript(data.partialTranscript);
-        };
-
-        // Слушаем обновления инсайтов
-        const handleInsightsUpdate = (event: any, newInsights: any) => {
-          console.log('🤖 [DATA WINDOW] Insights update received:', newInsights);
-          setInsights(newInsights || []);
-        };
-
-        ipcRenderer.on('transcript-update', handleTranscriptUpdate);
-        ipcRenderer.on('insights-update', handleInsightsUpdate);
-
-        return () => {
-          ipcRenderer.removeAllListeners('transcript-update');
-          ipcRenderer.removeAllListeners('insights-update');
-        };
-      }
-    }, []);
 
     return (
       <div className="data-window">
         <div className="data-window__header">
-          <h2>📝 Live Transcript</h2>
-          <div className="data-window__status">
-            {isRecording ? '🔴 Recording' : '⏸️ Stopped'}
+          <div className="header-left">
+            <h2>📝 Live Transcript</h2>
+            <div className={`data-window__status ${isRecording ? 'status--recording' : 'status--stopped'}`}>
+              {isRecording ? (
+                <>
+                  <span className="status-indicator recording-pulse"></span>
+                  🔴 Recording
+                </>
+              ) : (
+                <>
+                  <span className="status-indicator stopped"></span>
+                  ⏸️ Stopped
+                </>
+              )}
+            </div>
           </div>
+          
+          {/* Header actions removed - functions don't exist in current code */}
         </div>
         
         <div className="data-window__content">
           <div className="transcript-section">
             <h3>Current Transcript:</h3>
+            <div className="transcript-stats">
+              <span className="word-count">{transcript ? transcript.split(' ').length : 0} words</span>
+              <span className="char-count">{transcript ? transcript.length : 0} characters</span>
+            </div>
             <div className="transcript-text">
               {transcript || 'No transcript yet...'}
             </div>
           </div>
           
           {partialTranscript && (
-            <div className="partial-transcript-section">
-              <h3>Partial:</h3>
+            <div className="partial-transcript-section animate-fade-in">
+              <h3>🔄 Live:</h3>
               <div className="partial-transcript-text">
                 {partialTranscript}
               </div>
@@ -594,8 +571,8 @@ export function App() {
             <h3>AI Insights:</h3>
             <div className="insights-list">
               {insights.length > 0 ? (
-                insights.map((insight) => (
-                  <div key={insight.id} className="insight-item">
+                insights.map((insight, index) => (
+                  <div key={insight.id} className="insight-item animate-fade-in" style={{ animationDelay: `${index * 0.1}s` }}>
                     <span className="insight-icon">🤖</span>
                     <span className="insight-text">{insight.text}</span>
                   </div>

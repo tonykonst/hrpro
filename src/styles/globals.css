@@ -142,3 +142,78 @@ button:focus-visible {
   text-align: center;
   padding: 20px;
 }
+
+/* ===== NEW ENHANCED STYLES ===== */
+
+/* Status indicators */
+.status--recording {
+  background: rgba(239, 68, 68, 0.1) !important;
+  color: #dc2626 !important;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.status--stopped {
+  background: rgba(107, 114, 128, 0.1) !important;
+  color: #6b7280 !important;
+  border: 1px solid rgba(107, 114, 128, 0.3);
+}
+
+.status-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.recording-pulse {
+  background: #dc2626;
+  animation: pulse 2s infinite;
+}
+
+.stopped {
+  background: #6b7280;
+}
+
+/* Transcript stats */
+.transcript-stats {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.word-count,
+.char-count {
+  background: rgba(243, 244, 246, 0.8);
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(229, 231, 235, 0.8);
+}
+
+/* Animations */
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
