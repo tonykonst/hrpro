@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createDeepgramService, DeepgramService, TranscriptEvent } from "./services/deepgram";
+import { ITranscriptionService } from "./types/ITranscriptionService";
+import { TranscriptionServiceFactory } from "./services/transcription/TranscriptionServiceFactory";
 import { createClaudeService, ClaudeAnalysisService, AnalysisContext, InsightResponse, ClaudeServiceConfig } from "./services/claude";
 import { configService } from "./services/config";
 import { LegacyInsight } from "./types/events";
@@ -37,7 +39,7 @@ export function App() {
   
   // mediaRecorderRef удален - больше не нужен
   const streamRef = useRef<MediaStream | null>(null);
-  const deepgramRef = useRef<DeepgramService | null>(null);
+  const deepgramRef = useRef<ITranscriptionService | null>(null);
   const claudeRef = useRef<ClaudeAnalysisService | null>(null);
   const analysisContextRef = useRef<AnalysisContext | null>(null);
   // const ragServiceRef = useRef<RAGService | null>(null);
@@ -169,9 +171,11 @@ export function App() {
         console.log('⚠️ Post-editor not configured, skipping...');
       }
       
-      const deepgram = createDeepgramService(
-        deepgramConfig.apiKey,
-        async (event: TranscriptEvent) => {
+      // Создаем транскрипционный сервис через фабрику
+      const deepgram = TranscriptionServiceFactory.create({
+        provider: 'deepgram',
+        apiKey: deepgramConfig.apiKey,
+        onTranscript: async (event: TranscriptEvent) => {
           console.log('📝 [TRANSCRIPT] Received Deepgram event:', {
             type: event.type,
             text: event.text?.substring(0, 50) + '...',
@@ -217,7 +221,7 @@ export function App() {
             }
           }
         },
-        (error: string) => {
+        onError: (error: string) => {
           console.error('❌ [DEEPGRAM] Error:', error);
           setInsights(prev => [...prev.slice(-2), {
             id: Date.now().toString(),
@@ -228,7 +232,7 @@ export function App() {
         deepgramConfig,
         postEditorConfig,
         correctionContext
-      );
+      });
 
       deepgramRef.current = deepgram;
       await deepgram.connect();
