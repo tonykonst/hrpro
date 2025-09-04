@@ -73,7 +73,7 @@ function createDataWindow() {
     backgroundColor: '#00000000',
     hasShadow: true,
     alwaysOnTop: true,
-    skipTaskbar: true,
+    skipTaskbar: false,
     resizable: true,
     webPreferences: {
       nodeIntegration: true,
@@ -102,6 +102,12 @@ function createDataWindow() {
 
   dataWindow.webContents.on('did-finish-load', () => {
     console.log('Data Window loaded successfully');
+    if (dataWindow) {
+      console.log('Showing and focusing data window...');
+      dataWindow.show();
+      dataWindow.focus();
+      console.log('Data window should be visible now');
+    }
   });
 }
 
@@ -146,16 +152,50 @@ function setupIPC() {
   });
 
   // Передать транскрипт в окно данных
-  ipcMain.handle('send-transcript', (event, transcript, partialTranscript) => {
-    if (dataWindow) {
-      dataWindow.webContents.send('transcript-update', { transcript, partialTranscript });
+  ipcMain.handle('send-transcript', (event, data) => {
+    console.log('📝 [IPC] Sending transcript to data window:', data);
+    
+    try {
+      if (dataWindow) {
+        dataWindow.webContents.send('transcript-update', data);
+        console.log('✅ [IPC] Transcript sent successfully');
+      } else {
+        console.warn('⚠️ [IPC] Data window not available for transcript');
+      }
+    } catch (error) {
+      console.error('❌ [IPC] Failed to send transcript:', error);
     }
   });
 
   // Передать инсайты в окно данных
   ipcMain.handle('send-insights', (event, insights) => {
-    if (dataWindow) {
-      dataWindow.webContents.send('insights-update', insights);
+    console.log('🤖 [IPC] Sending insights to data window:', insights);
+    
+    try {
+      if (dataWindow) {
+        dataWindow.webContents.send('insights-update', insights);
+        console.log('✅ [IPC] Insights sent successfully');
+      } else {
+        console.warn('⚠️ [IPC] Data window not available for insights');
+      }
+    } catch (error) {
+      console.error('❌ [IPC] Failed to send insights:', error);
+    }
+  });
+
+  // Отправить изменение состояния записи
+  ipcMain.handle('send-recording-state', (event, isRecording) => {
+    console.log('🎤 [IPC] Sending recording state change:', isRecording);
+    
+    try {
+      if (dataWindow) {
+        dataWindow.webContents.send('recording-state-change', isRecording);
+        console.log('✅ [IPC] Recording state sent successfully');
+      } else {
+        console.warn('⚠️ [IPC] Data window not available for recording state');
+      }
+    } catch (error) {
+      console.error('❌ [IPC] Failed to send recording state:', error);
     }
   });
 

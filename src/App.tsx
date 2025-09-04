@@ -90,6 +90,77 @@ export function App() {
     });
   }, []);
 
+  // Функция для отправки данных в окно транскрипции
+  const sendToDataWindow = (type: 'transcript' | 'insights' | 'recording-state', data: any) => {
+    try {
+      if (window.require && windowType !== 'data') {
+        const { ipcRenderer } = window.require('electron');
+        console.log(`📤 [IPC] Sending ${type} to data window:`, data);
+        
+        if (type === 'transcript') {
+          ipcRenderer.invoke('send-transcript', data);
+        } else if (type === 'insights') {
+          ipcRenderer.invoke('send-insights', data);
+        } else if (type === 'recording-state') {
+          ipcRenderer.invoke('send-recording-state', data.isRecording);
+        }
+      }
+    } catch (error) {
+      console.warn(`⚠️ [IPC] Failed to send ${type}:`, error);
+    }
+  };
+
+  // Синхронизация данных между окнами через IPC
+  useEffect(() => {
+    if (windowType === 'data' && window.require) {
+      const { ipcRenderer } = window.require('electron');
+      
+      // Слушаем обновления транскрипта
+      const handleTranscriptUpdate = (event: any, data: any) => {
+        console.log('📝 [DATA WINDOW] Transcript update received:', data);
+        try {
+          if (data.transcript !== undefined) setTranscript(data.transcript);
+          if (data.partialTranscript !== undefined) setPartialTranscript(data.partialTranscript);
+          console.log('✅ [DATA WINDOW] State updated successfully');
+        } catch (error) {
+          console.error('❌ [DATA WINDOW] Failed to update transcript state:', error);
+        }
+      };
+
+      // Слушаем обновления инсайтов
+      const handleInsightsUpdate = (event: any, insights: any) => {
+        console.log('🤖 [DATA WINDOW] Insights update received:', insights);
+        try {
+          setInsights(insights || []);
+          console.log('✅ [DATA WINDOW] Insights updated successfully');
+        } catch (error) {
+          console.error('❌ [DATA WINDOW] Failed to update insights state:', error);
+        }
+      };
+
+      // Слушаем изменения состояния записи
+      const handleRecordingStateChange = (event: any, isRecordingState: boolean) => {
+        console.log('🎤 [DATA WINDOW] Recording state change:', isRecordingState);
+        try {
+          setIsRecording(isRecordingState);
+          console.log('✅ [DATA WINDOW] Recording state updated successfully');
+        } catch (error) {
+          console.error('❌ [DATA WINDOW] Failed to update recording state:', error);
+        }
+      };
+
+      ipcRenderer.on('transcript-update', handleTranscriptUpdate);
+      ipcRenderer.on('insights-update', handleInsightsUpdate);
+      ipcRenderer.on('recording-state-change', handleRecordingStateChange);
+
+      return () => {
+        ipcRenderer.removeAllListeners('transcript-update');
+        ipcRenderer.removeAllListeners('insights-update');
+        ipcRenderer.removeAllListeners('recording-state-change');
+      };
+    }
+  }, [windowType]);
+
   const checkMicPermission = async () => {
     try {
       console.log('Checking microphone permission...');
@@ -189,10 +260,7 @@ export function App() {
             console.log('🔄 [PARTIAL] Deepgram partial:', newPartial);
             
             // Отправляем в окно данных
-            if (window.require) {
-              const { ipcRenderer } = window.require('electron');
-              ipcRenderer.invoke('send-transcript', transcript, newPartial);
-            }
+            sendToDataWindow('transcript', { transcript, partialTranscript: newPartial });
           } else if (event.type === 'final') {
             // Обновляем отображаемый транскрипт
             const newTranscript = (transcript + ' ' + event.text).trim();
@@ -210,10 +278,7 @@ export function App() {
             });
             
             // Отправляем в окно данных
-            if (window.require) {
-              const { ipcRenderer } = window.require('electron');
-              ipcRenderer.invoke('send-transcript', newTranscript, '');
-            }
+            sendToDataWindow('transcript', { transcript: newTranscript, partialTranscript: '' });
             
             // Анализируем с помощью Claude если доступен
             if (event.text.length > 10) {
@@ -294,10 +359,7 @@ export function App() {
       setInsights(newInsights);
 
       // Отправляем в окно данных
-      if (window.require) {
-        const { ipcRenderer } = window.require('electron');
-        ipcRenderer.invoke('send-insights', newInsights);
-      }
+      sendToDataWindow('insights', newInsights);
 
       console.log('✅ Claude analysis complete:', {
         topic: analysis.topic,
@@ -321,6 +383,9 @@ export function App() {
       // СНАЧАЛА меняем состояние UI для мгновенной реакции
       setIsRecording(true);
       console.log('✅ [STEP 2] UI state updated to recording');
+      
+      // Отправляем состояние записи в окно транскрипции
+      sendToDataWindow('recording-state', { isRecording: true });
       
       // Создаем окно с данными при начале записи
       if (window.require) {
@@ -458,27 +523,34 @@ export function App() {
     setPartialTranscript('');
     // Оставляем transcript и insights для просмотра после остановки
     console.log('Recording stopped, session data preserved');
+    
+    // Отправляем состояние записи в окно транскрипции
+    sendToDataWindow('recording-state', { isRecording: false });
   };
 
   if (!isVisible) {
     return <div className="w-full h-full bg-transparent" />;
   }
 
-  // Рендер разных типов окон
+
+
+  // Если это окно данных - показываем интерфейс транскрипции
   if (windowType === 'data') {
-    // Окно с данными - слушаем IPC события
+    // Слушаем IPC события для окна данных
     useEffect(() => {
       if (window.require) {
         const { ipcRenderer } = window.require('electron');
         
         // Слушаем обновления транскрипта
         const handleTranscriptUpdate = (event: any, data: any) => {
-          setTranscript(data.transcript || '');
-          setPartialTranscript(data.partialTranscript || '');
+          console.log('📝 [DATA WINDOW] Transcript update received:', data);
+          if (data.transcript) setTranscript(data.transcript);
+          if (data.partialTranscript) setPartialTranscript(data.partialTranscript);
         };
 
         // Слушаем обновления инсайтов
         const handleInsightsUpdate = (event: any, newInsights: any) => {
+          console.log('🤖 [DATA WINDOW] Insights update received:', newInsights);
           setInsights(newInsights || []);
         };
 
@@ -486,37 +558,50 @@ export function App() {
         ipcRenderer.on('insights-update', handleInsightsUpdate);
 
         return () => {
-          ipcRenderer.removeListener('transcript-update', handleTranscriptUpdate);
-          ipcRenderer.removeListener('insights-update', handleInsightsUpdate);
+          ipcRenderer.removeAllListeners('transcript-update');
+          ipcRenderer.removeAllListeners('insights-update');
         };
       }
     }, []);
 
-    // Окно с данными (транскрипция + инсайты)
     return (
-      <div className="w-full h-full bg-white/80 backdrop-blur-md p-4">
-        <div className="content-panel">
-          <div className="content-section">
-            <div className="content-section__title">Transcript</div>
-            <div className="content-section__content">
-              {transcript || <span className="transcript-text--placeholder">Waiting for speech...</span>}
-              {partialTranscript && (
-                <span className="transcript-text--partial"> {partialTranscript}</span>
-              )}
+      <div className="data-window">
+        <div className="data-window__header">
+          <h2>📝 Live Transcript</h2>
+          <div className="data-window__status">
+            {isRecording ? '🔴 Recording' : '⏸️ Stopped'}
+          </div>
+        </div>
+        
+        <div className="data-window__content">
+          <div className="transcript-section">
+            <h3>Current Transcript:</h3>
+            <div className="transcript-text">
+              {transcript || 'No transcript yet...'}
             </div>
           </div>
           
-          <div className="content-section">
-            <div className="content-section__title">AI Insights</div>
-            <div className="content-section__content">
+          {partialTranscript && (
+            <div className="partial-transcript-section">
+              <h3>Partial:</h3>
+              <div className="partial-transcript-text">
+                {partialTranscript}
+              </div>
+            </div>
+          )}
+          
+          <div className="insights-section">
+            <h3>AI Insights:</h3>
+            <div className="insights-list">
               {insights.length > 0 ? (
                 insights.map((insight) => (
                   <div key={insight.id} className="insight-item">
-                    {insight.text}
+                    <span className="insight-icon">🤖</span>
+                    <span className="insight-text">{insight.text}</span>
                   </div>
                 ))
               ) : (
-                <div className="insight-placeholder">Analyzing speech patterns...</div>
+                <div className="insight-placeholder">Waiting for insights...</div>
               )}
             </div>
           </div>
