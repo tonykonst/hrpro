@@ -1,0 +1,80 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables (SECURITY: Never commit API keys)
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Build outputs
+dist/
+distmain/
+build/
+*.tsbuildinfo
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+.nyc_output/
+
+# Electron
+app/
+packages/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Testing
+.coverage/
+junit.xml
+
+# Security
+*.pem
+*.key
+*.crt
+*.cert
+
+# Local development
+.local/
+
+# External audio solutions (isolated)
+../external_audio_solutions/
+/external_audio_solutions/
+/extracted_components/temp/
+
+# Python environment for audio processing
+venv_audio/
+*.pyc
+__pycache__/

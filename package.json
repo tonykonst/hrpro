@@ -1,0 +1,46 @@
+{
+  "name": "hrpro",
+  "version": "0.1.0",
+  "description": "AI-powered interview assistant for HR professionals",
+  "main": "dist/main/main/main.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:vite\" \"wait-on http://localhost:5173 && npm run dev:electron\"",
+    "dev:vite": "vite",
+    "dev:electron": "tsc -p tsconfig.main.json && electron dist/main/main/main.js",
+    "build": "npm run build:vite && npm run build:electron",
+    "build:vite": "vite build",
+    "build:electron": "tsc -p tsconfig.main.json",
+    "compile-main": "tsc -p tsconfig.main.json",
+    "clean": "rimraf dist",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.16",
+    "concurrently": "^8.2.2",
+    "electron": "^28.0.0",
+    "postcss": "^8.4.32",
+    "rimraf": "^5.0.5",
+    "tailwind-scrollbar": "^3.0.5",
+    "tailwindcss": "^3.3.6",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.8",
+    "wait-on": "^7.2.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.60.0",
+    "@deepgram/sdk": "^4.11.2",
+    "dotenv": "^17.2.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "siriwave": "^2.4.0",
+    "stackblur-canvas": "^2.7.0",
+    "zod": "^3.22.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

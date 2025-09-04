@@ -1,0 +1,21 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+      "target": "ES2020",
+      "lib": ["ES2020", "DOM", "DOM.Iterable"],
+      "module": "ESNext",
+      "jsx": "react-jsx",
+      "outDir": "./dist/renderer",
+      "noEmit": true
+    },
+    "include": [
+      "src/renderer/**/*",
+      "src/components/**/*", 
+      "src/hooks/**/*",
+      "src/types/**/*"
+    ],
+    "exclude": [
+      "src/main/**/*",
+      "src/services/**/*"
+    ]
+  }

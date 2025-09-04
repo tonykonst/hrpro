@@ -1,0 +1,14 @@
+{
+  "session_id": "session_2024-01-15_14-30-45",
+  "start_time": 1705319445000,
+  "end_time": 1705319571000,
+  "total_segments": 14,
+  "avg_confidence": 0.8357142857142857,
+  "language_distribution": {
+    "mixed": 9,
+    "ru": 4,
+    "en": 1
+  },
+  "corrections_count": 3
+}
+

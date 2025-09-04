@@ -1,0 +1,243 @@
+You are working inside the Interview Assistant project.
+
+Interview Assistant is an AI service for HR that connects to a video call (Google Meet or Zoom), listens to the candidate’s speech in real time, and assists the interviewer.
+
+---
+
+## Project tasks
+
+1. Provide a live transcript of the interview.
+2. Analyze candidate answers using an LLM and the job knowledge base (Job Description, tech stack).
+3. Give HR short hints: strengths/weaknesses, risk areas, shallow answers, possible inconsistencies.
+4. Suggest clarifying follow-up questions to check the candidate’s knowledge depth.
+5. Save a final report (summary, strengths, risks, follow-ups, scores) in text format for HR.
+
+**Important:**
+
+* Do not directly accuse the candidate of using AI. Instead, note only indicators such as: "shallow," "generic," "no examples," "perfectly phrased but no details."
+* Answers must be short, structured, in JSON or Markdown format (depending on task).
+* Data is used only to help HR; the final decision remains with the human.
+* Style: neutral, professional, no marketing phrases.
+* Interviews average 1 hour. Latency must be low: insights every 2–4 seconds in small chunks.
+
+**CRITICAL RULE - NO FAKE DATA:**
+
+* NEVER EVER USE DEMO DATA, SIMULATIONS, OR FAKE RESULTS!!!!!!!!!!!!!!!!!!!!
+* ALL testing must use REAL APIs, REAL audio processing, REAL transcription services!!!!!!!!!!!!!!!!!!!!
+* NO pre-written sample texts, NO simulated confidence scores, NO fake quality metrics!!!!!!!!!!!!!!!!!!!!
+* If testing transcription quality - use REAL Whisper API vs REAL Deepgram results!!!!!!!!!!!!!!!!!!!!
+* Users expect REAL functionality, not demonstrations or simulations!!!!!!!!!!!!!!!!!!!!
+* Any demo/simulation must be explicitly labeled as such and never presented as real results!!!!!!!!!!!!!!!!!!!!!
+
+---
+
+## Stack (minimum)
+
+**Client (overlay):** Electron + React/TS
+
+* always-on-top, frameless, transparent window (macOS vibrancy / Windows layered)
+* WebSocket for stream events
+
+**Audio capture:**
+
+* macOS: microphone + (optional) Loopback/BlackHole for system audio
+Windows: WASAPI loopback
+
+* Chrome: tabCapture (Meet/Zoom Web)
+
+* Auto-select: if browser call → tabCapture, else → system loopback
+
+**Audio source separation (candidate vs HR):**
+
+* Capture system/loopback audio (Zoom/Meet/Teams output) — поток речи кандидата.
+
+* Capture HR microphone отдельно, но не отправлять в анализ; использовать только как reference для AEC/диаризации.
+
+* В ASR событиях помечать speaker: "candidate" или speaker: "hr". В LLM/RAG передавать только candidate-сегменты.
+
+**ASR (stream):** Deepgram Streaming
+
+* Partial results every 150–250 ms
+
+* Final result after 300–500 ms silence
+
+* Settings: auto language, punctuation, truecasing, phrase boosting (JD terms)
+
+**LLM:** Claude Sonnet — streaming responses
+
+**RAG:** Local vector DB (PgVector/Weaviate) + JD/stack files
+
+**Backend:** Node.js (Fastify) or Python (FastAPI)
+
+* WebSocket pub-sub (insights), REST for reports
+* Queue (BullMQ/Redis) for post-processing
+* Storage: Postgres + S3 (Supabase Storage)
+* Auth: org-key + report token links
+* Billing: Stripe (usage or package limits)
+
+---
+
+## Architecture (flow)
+
+Mic/Loopback/tabCapture → Deepgram Streaming → transcript + analysis chunks → RAG enrichment → insights/questions/flags → WebSocket → Electron overlay
+After call: aggregate → Markdown report → HTML via link.
+
+---
+
+## Implementation roadmap (sprints)
+
+### Sprint 1: Overlay + Audio + ASR
+
+* Electron window (alwaysOnTop, transparent, frameless, blur, click-through)
+* Hotkeys: Show/Hide, “Ask AI”
+* Audio capture: getUserMedia (macOS), WASAPI (Windows), tabCapture (Chrome)
+* Connect to Deepgram Streaming API, receive streaming transcript/analysis events
+
+### Sprint 2: RAG + Live insights
+
+* RAG DB: JD, requirements, guide questions
+* Index: PgVector + embeddings
+* Aggregate last 15–40 sec of transcript adaptively (expand on terms/low confidence)
+* Enrich with RAG
+* Deliver insights/questions every 2–4 sec via WebSocket
+
+### Sprint 3: Report & cost-efficient output
+
+* Save raw transcript JSON + metadata
+* Generate Markdown report (Summary, Strengths, Risks, Follow-ups, Scores, Red flags)
+* HTML wrapper, link with token
+* Email HR with link
+
+### Sprint 4: Real-time UX polish
+
+* Floating panel snap to active window
+* Presets for hint types
+* Spam protection, degrade to “transcript only” if lagging
+
+---
+
+## Prompts (Claude / LLM)
+
+**System (speech analysis):**
+
+* Classify topic
+* Score depth 0–1
+* Detect risks (generic, inconsistent, “perfect”)
+* Suggest 1–2 follow-up questions
+* Never accuse of cheating, only note indicators
+* Strict JSON output (<120 chars hints)
+
+**User (every tick):**
+
+* JD context
+* Last 15–40s transcript (adaptive)
+* Entities memory (last 20 terms)
+* History of topics/risks
+* Must return JSON with topic, depth\_score, signals, followups, note
+
+**Post-interview report:**
+
+* Markdown with Summary, Strengths, Risks (with timestamps), Follow-ups, Scores, Red flags.
+
+---
+
+## Event schema
+
+* `asr_partial` — transcript piece
+* `asr_final` — final transcript piece
+* `nlu_insight` — new insight card
+* `score_update` — update depth/topic score
+* `notice` — system messages
+
+---
+
+## Endpoints
+
+* POST /session/start
+* WS /session/{id}
+* POST /session/{id}/finalize
+* GET /report/{token}
+* POST /auth/api-key
+* POST /billing/webhook
+
+---
+
+## Electron tricks
+
+* Transparent always-on-top window, vibrancy, blur CSS
+* Click-through
+* Rounded corners, shadows
+* Global hotkeys
+
+---
+
+## Latency & cost
+
+* Target: streaming <900 ms total latency (p95)
+* Costs: \~\$0.18–1.20/hr for ASR + a few cents for LLM
+
+---
+
+## Security
+
+* Store only text + aggregates
+* Mask PII
+* Tokenized report links
+
+---
+
+## Roadmap upgrades
+
+* Speaker diarization
+* Temporal signals (delays, pace)
+* Anti-spoof heuristics
+* Zoom App version
+* PDF export (Pro)
+
+---
+
+## Architecture principles
+
+* Modular domains: capture, realtime, nlu, rag, reports, ui, billing, auth, storage, infra
+* Loose coupling, event contracts
+* Pub/Sub event bus
+* Stateless, horizontal scale
+* Backpressure handling
+* Config via env only
+* Observability: OpenTelemetry, Prometheus, Loki
+* Feature flags
+* Secrets manager
+
+---
+
+## Testing pyramid
+
+* Unit, contract, integration, e2e
+* API facades with mocks
+* Performance budgets enforced
+* Security scans in CI
+
+---
+
+## Error handling
+
+* Explicit errors only, stack in logs
+* Retry with jitter
+* Dead-letter queue
+
+---
+
+## Compliance
+
+* GDPR/DPIA
+* SOC2/ISO later
+
+---
+
+## Documentation requirement
+
+For this functionality **detailed developer documentation is mandatory** (setup, audio capture, ASR integration, event schema, prompt usage, deployment). Every module must have README and code comments that explain **why** the design choices were made. This ensures new developers can easily understand and extend the system.
+
+---
+
+This document captures the Interview Assistant project with requirements, stack, architecture, roadmap, prompts, event schema, compliance details, and updated cost model (Deepgram Streaming as default). It also highlights the need for thorough documentation for developers.

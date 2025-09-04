@@ -1,0 +1,12 @@
+{
+  "session_id": "session_2025-09-04_10-22-44",
+  "start_time": 1756970564611,
+  "total_segments": 3,
+  "avg_confidence": 0.6151462333333333,
+  "language_distribution": {
+    "mixed": 1,
+    "ru": 2
+  },
+  "corrections_count": 0,
+  "end_time": 1756970571439
+}
