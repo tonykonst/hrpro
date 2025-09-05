@@ -11,25 +11,22 @@ export { LocalVectorStore, createVectorStore, VectorOperations } from './vector-
 
 // Types and interfaces
 export * from './types';
+import { RAGErrorCode } from './types';
+import { RAGService } from './rag-service';
 
 // Utility functions and helpers
 export {
   // Document processing utilities
-  type ProcessedDocument,
-  type ChunkingStrategy
 } from './document-processor';
 
 export {
   // Embedding utilities
-  type EmbeddingProvider,
-  type EmbeddingCache
 } from './embeddings';
 
 export {
   // Vector store utilities
-  type VectorIndex,
-  type SimilarityMetric
 } from './vector-store';
+
 
 // Configuration presets
 export const RAG_PRESETS = {
@@ -150,7 +147,7 @@ export function createQuickRAGService(
   const config = { ...RAG_PRESETS[preset] };
   
   if (apiKey && config.embedding.provider === 'openai') {
-    config.embedding.apiKey = apiKey;
+    (config.embedding as any).apiKey = apiKey;
   }
 
   return new RAGService(config);
@@ -296,7 +293,7 @@ export const ragPerformanceMonitor = new RAGPerformanceMonitor();
 
 // Error handling utilities
 export function isRAGError(error: any): error is import('./types').RAGError {
-  return error && error.code && Object.values(import('./types').RAGErrorCode).includes(error.code);
+  return error && error.code && Object.values(RAGErrorCode).includes(error.code);
 }
 
 export function handleRAGError(error: unknown, context?: Record<string, any>): {
@@ -338,7 +335,7 @@ export class RAGMigrationHelper {
       version: '2.0',
       exportedAt: new Date().toISOString(),
       stats,
-      documents: documents.map(doc => ({
+      documents: documents.map((doc: any) => ({
         id: doc.id,
         type: doc.type,
         metadata: doc.metadata,

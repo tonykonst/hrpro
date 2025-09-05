@@ -362,7 +362,7 @@ export class DeepgramService {
     } catch (error) {
       console.warn('⚠️ Segment correction failed:', {
         segment_id: segmentId,
-        error: error.message || error
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   }

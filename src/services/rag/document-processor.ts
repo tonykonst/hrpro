@@ -70,7 +70,7 @@ export class DocumentProcessor {
     } catch (error) {
       console.error('❌ Document processing error:', error);
       throw new RAGError(
-        `Failed to process document: ${error.message}`,
+        `Failed to process document: ${error instanceof Error ? error.message : String(error)}`,
         RAGErrorCode.DOCUMENT_PARSE_ERROR,
         { type, metadata },
         true
@@ -525,7 +525,7 @@ export class DocumentProcessor {
       resume: ['experience', 'skills', 'education', 'projects', 'achievements']
     };
 
-    const keywords = topicKeywords[type] || [];
+    const keywords = (topicKeywords as Record<DocumentType, string[]>)[type] || [];
     for (const keyword of keywords) {
       if (firstSentence.toLowerCase().includes(keyword)) {
         return keyword;
@@ -571,11 +571,11 @@ export class DocumentProcessor {
       }
     };
 
-    const patterns = sectionPatterns[type];
+    const patterns = (sectionPatterns as any)[type];
     if (!patterns) return undefined;
 
     for (const [section, pattern] of Object.entries(patterns)) {
-      if (pattern.test(content)) {
+      if ((pattern as RegExp).test(content)) {
         return section;
       }
     }

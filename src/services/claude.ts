@@ -32,7 +32,7 @@ export interface ClaudeServiceConfig {
 
 export class ClaudeAnalysisService {
   private anthropic: Anthropic | null;
-  private systemPrompt: string;
+  private systemPrompt: string = '';
   private config: ClaudeServiceConfig;
   private ragService?: RAGService;
 
@@ -123,10 +123,13 @@ RESPONSE FORMAT (strict JSON):
       if (!this.anthropic) {
         console.warn('⚠️ [CLAUDE] Anthropic not initialized, skipping analysis');
         return {
-          insights: [],
-          summary: 'Claude service not available',
+          note: 'Claude service not available',
+          type: 'strength' as const,
+          topic: 'Service unavailable',
           confidence: 0,
-          timestamp: new Date().toISOString()
+          depth_score: 0,
+          signals: [],
+          followups: []
         };
       }
 
@@ -290,11 +293,10 @@ Respond with valid JSON only.`;
       if (!this.anthropic) {
         console.warn('⚠️ [CLAUDE] Anthropic not initialized, skipping report generation');
         return {
-          overallAssessment: 'Claude service not available',
-          technicalCompetency: 'N/A',
-          communicationClarity: 'N/A',
-          practicalExperience: 'N/A',
-          areasToExplore: [],
+          summary: 'Claude service not available',
+          strengths: [],
+          risks: [],
+          scores: {},
           recommendations: ['Configure Claude API key to enable analysis']
         };
       }

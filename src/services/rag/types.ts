@@ -226,10 +226,18 @@ export interface RAGMetrics {
 }
 
 // Error Handling
-export interface RAGError extends Error {
+export class RAGError extends Error {
   code: RAGErrorCode;
   context?: Record<string, any>;
   retriable: boolean;
+
+  constructor(message: string, code: RAGErrorCode, context?: Record<string, any>, retriable: boolean = false) {
+    super(message);
+    this.name = 'RAGError';
+    this.code = code;
+    this.context = context;
+    this.retriable = retriable;
+  }
 }
 
 export enum RAGErrorCode {

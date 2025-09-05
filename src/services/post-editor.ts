@@ -141,11 +141,10 @@ export class PostEditorService {
       if (!this.anthropic) {
         console.warn('⚠️ [POST-EDITOR] Anthropic not initialized, skipping correction');
         return {
-          originalText: text,
           correctedText: text,
-          changes: [],
           confidence: 0,
-          reasoning: 'Anthropic not initialized'
+          wasChanged: false,
+          processingTimeMs: 0
         };
       }
 

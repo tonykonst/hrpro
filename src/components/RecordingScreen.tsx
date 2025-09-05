@@ -1,5 +1,5 @@
 import React from 'react';
-import { WaveLoader } from './WaveLoader';
+import { WaveLoader } from './common/WaveLoader';
 import { LegacyInsight } from '../types/events';
 
 interface RecordingScreenProps {
@@ -49,7 +49,7 @@ export function RecordingScreen({
             <WaveLoader 
               isActive={true}
               audioLevel={audioLevel}
-              partialTranscript={partialTranscript}
+              className="wave-loader--recording"
             />
           </div>
           

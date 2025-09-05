@@ -90,9 +90,11 @@ export class LanguageDetector {
     });
     
     // Возвращаем язык с максимальным количеством
-    const dominant = Object.entries(langCounts).reduce((a, b) => 
-      langCounts[a[0]] > langCounts[b[0]] ? a : b
-    )[0] as 'ru' | 'en' | 'mixed';
+    const dominant = Object.entries(langCounts).reduce((a, b) => {
+      const aKey = a[0] as keyof typeof langCounts;
+      const bKey = b[0] as keyof typeof langCounts;
+      return langCounts[aKey] > langCounts[bKey] ? a : b;
+    })[0] as 'ru' | 'en' | 'mixed';
     
     return dominant;
   }
@@ -103,22 +105,21 @@ export class LanguageDetector {
     
     // Переключаемся только если есть явное доминирование (не mixed)
     if (dominant === 'mixed') {
+      // Если доминирует mixed язык - переключаемся обратно на multi
+      if (currentLanguageSetting !== 'multi') {
+        return { switch: true, newSetting: 'multi' };
+      }
       return { switch: false, newSetting: currentLanguageSetting };
     }
     
     // Если доминирует один язык, а у нас multi - можно оптимизировать
-    if (currentLanguageSetting === 'multi' && dominant !== 'mixed') {
+    if (currentLanguageSetting === 'multi' && (dominant === 'ru' || dominant === 'en')) {
       const recentConfidence = this.getRecentConfidence(dominant);
       
       // Переключаемся на конкретный язык только при высокой уверенности
       if (recentConfidence > 0.85) {
         return { switch: true, newSetting: dominant };
       }
-    }
-    
-    // Если доминирует другой язык - переключаемся обратно на multi
-    if (currentLanguageSetting !== 'multi' && dominant === 'mixed') {
-      return { switch: true, newSetting: 'multi' };
     }
     
     return { switch: false, newSetting: currentLanguageSetting };

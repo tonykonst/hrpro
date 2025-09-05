@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { ControlPanel, DataWindow } from "./components";
 import { useWindowManager } from "./hooks/useWindowManager";
 import { useDataSync } from "./hooks/useDataSync";
-import { useTranscription } from "./hooks/useTranscription";
+import { useTranscription } from "./hooks/transcription";
 import { useAudioRecording } from "./hooks/useAudioRecording";
 
 // Типы для IPC - теперь используется безопасный electronAPI

@@ -41,10 +41,18 @@ export interface SessionMetadata {
 
 export class TranscriptLogger {
   private logsDir: string;
-  private currentSessionId: string;
-  private sessionStartTime: number;
+  private currentSessionId: string = '';
+  private sessionStartTime: number = 0;
   private transcriptEntries: TranscriptEntry[] = [];
-  private sessionMetadata: SessionMetadata;
+  private sessionMetadata: SessionMetadata = {
+    session_id: '',
+    start_time: Date.now(),
+    end_time: 0,
+    total_segments: 0,
+    avg_confidence: 0,
+    language_distribution: {},
+    corrections_count: 0
+  };
 
   constructor(baseDir: string = './logs') {
     if (!this.isFileSystemAvailable()) {
@@ -305,13 +313,13 @@ ${Object.entries(this.sessionMetadata.language_distribution)
 
     try {
       const files = fs.readdirSync(this.logsDir)
-        .filter(file => file.startsWith('session_') && file.endsWith('.md'))
+        .filter((file: string) => file.startsWith('session_') && file.endsWith('.md'))
         .sort()
         .reverse(); // Новые файлы сначала
 
       const filesToDelete = files.slice(keepLastN);
       
-      filesToDelete.forEach(file => {
+      filesToDelete.forEach((file: string) => {
         const mdPath = path.join(this.logsDir, file);
         const jsonPath = path.join(this.logsDir, file.replace('.md', '_metadata.json'));
         

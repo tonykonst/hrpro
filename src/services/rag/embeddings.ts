@@ -101,9 +101,9 @@ class OpenAIEmbeddingProvider extends EmbeddingProvider {
       }
       
       throw new RAGError(
-        `Failed to generate OpenAI embeddings: ${error.message}`,
+        `Failed to generate OpenAI embeddings: ${error instanceof Error ? error.message : String(error)}`,
         RAGErrorCode.EMBEDDING_ERROR,
-        { originalError: error.message },
+        { originalError: error instanceof Error ? error.message : String(error) },
         true
       );
     }
@@ -279,7 +279,7 @@ export class EmbeddingService {
       }
       
       throw new RAGError(
-        `Embedding generation failed: ${error.message}`,
+        `Embedding generation failed: ${error instanceof Error ? error.message : String(error)}`,
         RAGErrorCode.EMBEDDING_ERROR,
         { textsCount: validTexts.length, provider: this.config.provider },
         true

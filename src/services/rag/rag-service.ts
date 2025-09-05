@@ -98,7 +98,7 @@ export class RAGService {
       }
       
       throw new RAGError(
-        `Failed to add document: ${error.message}`,
+        `Failed to add document: ${error instanceof Error ? error.message : String(error)}`,
         RAGErrorCode.DOCUMENT_PARSE_ERROR,
         { type, contentLength: content.length },
         true
@@ -126,7 +126,7 @@ export class RAGService {
         documentIds.push(documentId);
       } catch (error) {
         console.error(`❌ Failed to add document ${i}:`, error);
-        errors.push({ index: i, error: error.message });
+        errors.push({ index: i, error: error instanceof Error ? error.message : String(error) });
         documentIds.push(''); // Placeholder for failed document
       }
     }
@@ -247,7 +247,7 @@ export class RAGService {
       }
       
       throw new RAGError(
-        `Context retrieval failed: ${error.message}`,
+        `Context retrieval failed: ${error instanceof Error ? error.message : String(error)}`,
         RAGErrorCode.SEARCH_ERROR,
         { query: query.substring(0, 100) },
         true
@@ -288,7 +288,7 @@ export class RAGService {
     } catch (error) {
       console.error('❌ Search failed:', error);
       throw new RAGError(
-        `Search failed: ${error.message}`,
+        `Search failed: ${error instanceof Error ? error.message : String(error)}`,
         RAGErrorCode.SEARCH_ERROR,
         { query: searchQuery.text },
         true
@@ -324,7 +324,7 @@ export class RAGService {
     } catch (error) {
       console.error('❌ Failed to remove document:', error);
       throw new RAGError(
-        `Failed to remove document: ${error.message}`,
+        `Failed to remove document: ${error instanceof Error ? error.message : String(error)}`,
         RAGErrorCode.VECTOR_STORE_ERROR,
         { documentId },
         true
