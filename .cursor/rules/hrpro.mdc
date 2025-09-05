@@ -1,6 +1,6 @@
 You are working inside the Interview Assistant project.
 
-Interview Assistant is an AI service for HR that connects to a video call (Google Meet or Zoom), listens to the candidate’s speech in real time, and assists the interviewer.
+Interview Assistant is an Electron-based desktop application for HR specialists that provides real-time interview transcription, AI-powered candidate analysis, and insights for decision-making. The system operates as a standalone desktop application without requiring external backend services.
 
 ---
 
@@ -31,88 +31,119 @@ Interview Assistant is an AI service for HR that connects to a video call (Googl
 
 ---
 
-## Stack (minimum)
+## Current Architecture (v0.51)
 
-**Client (overlay):** Electron + React/TS
+**Desktop Application:** Electron + React/TypeScript
 
-* always-on-top, frameless, transparent window (macOS vibrancy / Windows layered)
-* WebSocket for stream events
+* **Main Process:** Window management, IPC handlers, global shortcuts
+* **Renderer Process:** React UI with modular components
+* **Preload Script:** Secure API bridge between main and renderer
+* **Always-on-top, frameless, transparent windows** (macOS vibrancy / Windows layered)
 
-**Audio capture:**
+**Audio Processing:**
 
-* macOS: microphone + (optional) Loopback/BlackHole for system audio
-Windows: WASAPI loopback
+* **AudioWorklet:** Real-time PCM processing (Float32 → Int16 conversion)
+* **AudioContext:** 16kHz sample rate, single channel
+* **Microphone capture:** getUserMedia with optimized constraints
+* **Real-time audio analysis:** Level monitoring and visualization
 
-* Chrome: tabCapture (Meet/Zoom Web)
+**Speech Recognition:** Deepgram Streaming API
 
-* Auto-select: if browser call → tabCapture, else → system loopback
+* **Model:** nova-2-meeting (optimized for interview context)
+* **Settings:** Auto language detection, punctuation, smart formatting
+* **Partial results:** Every 100-250ms for real-time feedback
+* **Final results:** After 300-800ms silence (adaptive endpointing)
+* **Adaptive ASR:** Dynamic parameter optimization based on confidence
 
-**Audio source separation (candidate vs HR):**
+**AI Analysis:** Claude Sonnet 4
 
-* Capture system/loopback audio (Zoom/Meet/Teams output) — поток речи кандидата.
+* **Model:** claude-sonnet-4-20250514
+* **Context window:** Last 15-40 seconds of transcript (adaptive)
+* **Output format:** JSON with topic, depth_score, signals, followups
+* **Rate limiting:** 3 requests/second with timeout protection
 
-* Capture HR microphone отдельно, но не отправлять в анализ; использовать только как reference для AEC/диаризации.
+**Post-Processing:** ASR Correction System
 
-* В ASR событиях помечать speaker: "candidate" или speaker: "hr". В LLM/RAG передавать только candidate-сегменты.
+* **Model:** claude-3-haiku-20240307 (fast correction)
+* **Triggers:** Low confidence, technical terms, mixed language
+* **Processing time:** <500ms timeout
+* **Fallback:** Original text on error
 
-**ASR (stream):** Deepgram Streaming
+**RAG System:** Context Enhancement
 
-* Partial results every 150–250 ms
+* **Document processing:** Job descriptions, requirements, tech stack
+* **Embeddings:** Local vector storage for relevant context
+* **Context injection:** Enhanced prompts with relevant information
 
-* Final result after 300–500 ms silence
+**Data Storage:** Local File System
 
-* Settings: auto language, punctuation, truecasing, phrase boosting (JD terms)
-
-**LLM:** Claude Sonnet — streaming responses
-
-**RAG:** Local vector DB (PgVector/Weaviate) + JD/stack files
-
-**Backend:** Node.js (Fastify) or Python (FastAPI)
-
-* WebSocket pub-sub (insights), REST for reports
-* Queue (BullMQ/Redis) for post-processing
-* Storage: Postgres + S3 (Supabase Storage)
-* Auth: org-key + report token links
-* Billing: Stripe (usage or package limits)
+* **Transcript logs:** Markdown files in `transcript-logs/` directory
+* **Session metadata:** JSON format with timestamps and confidence scores
+* **No external database:** All data stored locally for privacy
 
 ---
 
-## Architecture (flow)
+## Architecture Flow (Current Implementation)
 
-Mic/Loopback/tabCapture → Deepgram Streaming → transcript + analysis chunks → RAG enrichment → insights/questions/flags → WebSocket → Electron overlay
-After call: aggregate → Markdown report → HTML via link.
+**Audio Pipeline:**
+Microphone → AudioWorklet (PCM processing) → Deepgram WebSocket → Real-time transcript
+
+**Analysis Pipeline:**
+Transcript segments → Claude AI analysis → RAG context enhancement → Insights generation
+
+**UI Synchronization:**
+Control Panel (recording) → IPC → Data Window (display) → Real-time updates
+
+**Data Flow:**
+1. **Audio Capture:** getUserMedia → AudioContext → AudioWorkletNode
+2. **Speech Recognition:** PCM data → Deepgram API → Partial/Final transcripts
+3. **AI Analysis:** Transcript → Claude API → Insights (strength/risk/question)
+4. **Post-Processing:** Low confidence segments → Correction system
+5. **UI Updates:** State changes → IPC → Window synchronization
+6. **Logging:** All events → Local markdown files
+
+**Window Management:**
+- **Control Panel:** Compact recording interface (200x56px)
+- **Data Window:** Full transcript and insights display (600x400px)
+- **IPC Communication:** Secure data transfer between windows
+- **Global Shortcuts:** Ctrl+\ for show/hide functionality
 
 ---
 
-## Implementation roadmap (sprints)
+## Implementation Status (Current: v0.51)
 
-### Sprint 1: Overlay + Audio + ASR
+### ✅ Sprint 1: Core Desktop Application (COMPLETED)
 
-* Electron window (alwaysOnTop, transparent, frameless, blur, click-through)
-* Hotkeys: Show/Hide, “Ask AI”
-* Audio capture: getUserMedia (macOS), WASAPI (Windows), tabCapture (Chrome)
-* Connect to Deepgram Streaming API, receive streaming transcript/analysis events
+* **Electron Application:** Always-on-top, transparent, frameless windows
+* **Global Shortcuts:** Ctrl+\ for show/hide functionality
+* **Audio Capture:** getUserMedia with optimized constraints
+* **Deepgram Integration:** Real-time streaming transcription
+* **Basic UI:** Control panel and data window components
 
-### Sprint 2: RAG + Live insights
+### ✅ Sprint 2: Modular Architecture & AI Analysis (COMPLETED)
 
-* RAG DB: JD, requirements, guide questions
-* Index: PgVector + embeddings
-* Aggregate last 15–40 sec of transcript adaptively (expand on terms/low confidence)
-* Enrich with RAG
-* Deliver insights/questions every 2–4 sec via WebSocket
+* **Modular Components:** UI split into ui/, control/, data/ modules
+* **Modular Hooks:** useTranscription broken into specialized hooks
+* **Claude AI Integration:** Real-time analysis with context enhancement
+* **RAG System:** Document processing and context injection
+* **Post-Editor:** ASR correction for low-confidence segments
+* **IPC Communication:** Secure data synchronization between windows
 
-### Sprint 3: Report & cost-efficient output
+### ✅ Sprint 3: Advanced Features (COMPLETED)
 
-* Save raw transcript JSON + metadata
-* Generate Markdown report (Summary, Strengths, Risks, Follow-ups, Scores, Red flags)
-* HTML wrapper, link with token
-* Email HR with link
+* **Adaptive ASR:** Dynamic parameter optimization
+* **Error Handling:** Comprehensive error management with fallbacks
+* **Security:** Context isolation, secure preload scripts
+* **Logging:** Local transcript storage in markdown format
+* **Performance:** AudioWorklet for real-time processing
 
-### Sprint 4: Real-time UX polish
+### 🔄 Sprint 4: Future Enhancements (PLANNED)
 
-* Floating panel snap to active window
-* Presets for hint types
-* Spam protection, degrade to “transcript only” if lagging
+* **Speaker Diarization:** Separate candidate vs interviewer speech
+* **Advanced Analytics:** Temporal signals, pace analysis
+* **Export Features:** PDF reports, data export
+* **Multi-language Support:** Enhanced language detection
+* **Performance Optimization:** Further latency improvements
 
 ---
 
@@ -141,33 +172,53 @@ After call: aggregate → Markdown report → HTML via link.
 
 ---
 
-## Event schema
+## Event Schema (Current Implementation)
 
-* `asr_partial` — transcript piece
-* `asr_final` — final transcript piece
-* `nlu_insight` — new insight card
-* `score_update` — update depth/topic score
-* `notice` — system messages
+**IPC Events:**
+* `transcript-update` — Real-time transcript data
+* `insights-update` — AI-generated insights
+* `recording-state-change` — Recording status updates
+* `window-created` — Window management events
+* `window-closed` — Window cleanup events
+
+**Transcript Events:**
+* `partial` — Interim transcript results
+* `final` — Confirmed transcript segments
+* `corrected` — Post-editor corrections
+
+**Analysis Events:**
+* `insight` — New AI insight (strength/risk/question)
+* `topic-change` — Subject matter transitions
+* `confidence-update` — ASR confidence metrics
+
+**System Events:**
+* `error` — Error notifications
+* `warning` — System warnings
+* `info` — Status messages
 
 ---
 
-## Endpoints
+## Electron Implementation Details
 
-* POST /session/start
-* WS /session/{id}
-* POST /session/{id}/finalize
-* GET /report/{token}
-* POST /auth/api-key
-* POST /billing/webhook
+**Window Configuration:**
+* **Transparent windows:** macOS vibrancy, Windows layered transparency
+* **Always-on-top:** Stays above video call applications
+* **Frameless design:** Custom UI without system chrome
+* **Click-through:** Optional click-through mode for overlay behavior
+* **Global shortcuts:** Ctrl+\ for show/hide functionality
 
----
+**Security Features:**
+* **Context isolation:** `contextIsolation: true`
+* **No node integration:** `nodeIntegration: false`
+* **Web security:** `webSecurity: true`
+* **Preload scripts:** Secure API bridge between processes
+* **API key protection:** Environment variables via preload
 
-## Electron tricks
-
-* Transparent always-on-top window, vibrancy, blur CSS
-* Click-through
-* Rounded corners, shadows
-* Global hotkeys
+**Performance Optimizations:**
+* **Background throttling disabled:** `backgroundThrottling: false`
+* **AudioWorklet processing:** Real-time audio without main thread blocking
+* **IPC optimization:** Efficient data transfer between windows
+* **Memory management:** Proper cleanup of audio contexts and streams
 
 ---
 
@@ -196,17 +247,74 @@ After call: aggregate → Markdown report → HTML via link.
 
 ---
 
-## Architecture principles
+## Modular Architecture (v0.51 Refactoring)
 
-* Modular domains: capture, realtime, nlu, rag, reports, ui, billing, auth, storage, infra
-* Loose coupling, event contracts
-* Pub/Sub event bus
-* Stateless, horizontal scale
-* Backpressure handling
-* Config via env only
-* Observability: OpenTelemetry, Prometheus, Loki
-* Feature flags
-* Secrets manager
+**Component Structure:**
+```
+src/components/
+├── ui/                    # Reusable UI components
+│   ├── Button.tsx         # Generic button component
+│   ├── Panel.tsx          # Container components
+│   ├── Transcript.tsx     # Transcript display
+│   └── Insights.tsx       # Insights display
+├── control/               # Control panel components
+│   ├── ControlPanel.tsx   # Main control interface
+│   ├── StartButton.tsx    # Recording start button
+│   ├── StopButton.tsx     # Recording stop button
+│   └── DragZone.tsx       # Window drag area
+├── data/                  # Data window components
+│   ├── DataWindow.tsx     # Main data display
+│   ├── TranscriptSection.tsx
+│   └── InsightsSection.tsx
+└── common/                # Shared components
+    └── WaveLoader.tsx     # Audio visualization
+```
+
+**Hook Architecture:**
+```
+src/hooks/transcription/
+├── index.ts                    # Main export
+├── useTranscription.ts         # Simplified main hook
+├── useTranscriptionCore.ts     # Core state management
+├── useTranscriptionCallbacks.ts # Event handlers
+├── useTranscriptionState.ts    # State management
+├── useTranscriptionServices.ts # Service integration
+└── useTranscriptionRecording.ts # Recording logic
+```
+
+**Service Interfaces:**
+* **ITranscriptionService:** Deepgram integration contract
+* **IAnalysisService:** Claude AI analysis contract
+* **IConfigService:** Configuration management contract
+* **IErrorHandler:** Error management contract
+
+---
+
+## Architecture Principles (Current Implementation)
+
+**Modular Design:**
+* **Component separation:** ui/, control/, data/ modules
+* **Hook specialization:** useTranscriptionCore, useTranscriptionCallbacks, etc.
+* **Service interfaces:** ITranscriptionService, IAnalysisService, IConfigService
+* **Loose coupling:** Event-driven communication between modules
+
+**Type Safety:**
+* **Strict TypeScript:** Comprehensive type definitions
+* **Interface contracts:** Well-defined API boundaries
+* **Error handling:** AppError class with structured error management
+* **Runtime validation:** Input validation and type checking
+
+**Performance:**
+* **Real-time processing:** AudioWorklet for non-blocking audio
+* **Adaptive algorithms:** Dynamic ASR parameter optimization
+* **Rate limiting:** API call throttling and timeout protection
+* **Memory efficiency:** Proper resource cleanup and garbage collection
+
+**Security:**
+* **Process isolation:** Electron security best practices
+* **API key protection:** Secure environment variable handling
+* **Local storage:** No external data transmission
+* **Input sanitization:** Safe handling of user data
 
 ---
 
@@ -219,11 +327,25 @@ After call: aggregate → Markdown report → HTML via link.
 
 ---
 
-## Error handling
+## Error Handling (Current Implementation)
 
-* Explicit errors only, stack in logs
-* Retry with jitter
-* Dead-letter queue
+**Error Management:**
+* **AppError class:** Structured error handling with context
+* **ErrorHandler utility:** Centralized error processing and retry logic
+* **Fallback mechanisms:** Graceful degradation on service failures
+* **Logging:** Comprehensive error logging with stack traces
+
+**Recovery Strategies:**
+* **API failures:** Automatic retry with exponential backoff
+* **Audio issues:** Fallback to basic recording mode
+* **Network problems:** Offline mode with local processing
+* **Memory issues:** Automatic cleanup and resource management
+
+**User Experience:**
+* **Non-blocking errors:** UI remains responsive during failures
+* **Error notifications:** Clear user feedback on issues
+* **Recovery options:** Manual retry and reset functionality
+* **Graceful shutdown:** Proper cleanup on application exit
 
 ---
 
@@ -234,10 +356,28 @@ After call: aggregate → Markdown report → HTML via link.
 
 ---
 
-## Documentation requirement
+## Documentation Status (v0.51)
 
-For this functionality **detailed developer documentation is mandatory** (setup, audio capture, ASR integration, event schema, prompt usage, deployment). Every module must have README and code comments that explain **why** the design choices were made. This ensures new developers can easily understand and extend the system.
+**Current Documentation:**
+* **Complete system documentation:** DOCS/DOCUMENTATION.md (2,349 lines)
+* **Modular architecture guide:** Detailed component and hook documentation
+* **API documentation:** Service interfaces and type definitions
+* **Security guidelines:** Electron security best practices
+* **Performance optimization:** AudioWorklet and ASR tuning guides
+
+**Developer Resources:**
+* **Setup instructions:** Environment configuration and dependencies
+* **Architecture overview:** System flow and component relationships
+* **Code examples:** Real implementation snippets with explanations
+* **Troubleshooting:** Common issues and solutions
+* **Extension guide:** How to add new features and modules
+
+**Maintenance:**
+* **Version tracking:** Current v0.51 with change history
+* **Update procedures:** How to sync documentation with code changes
+* **Code comments:** Inline documentation explaining design decisions
+* **README files:** Module-specific setup and usage instructions
 
 ---
 
-This document captures the Interview Assistant project with requirements, stack, architecture, roadmap, prompts, event schema, compliance details, and updated cost model (Deepgram Streaming as default). It also highlights the need for thorough documentation for developers.
+This document captures the Interview Assistant project v0.51 with current architecture, implementation status, and detailed technical specifications. The system is a fully functional Electron desktop application with modular architecture, real-time AI analysis, and comprehensive error handling.
