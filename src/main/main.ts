@@ -170,10 +170,11 @@ function createDataWindow() {
       dataWindow.focus();
       
       // Включаем DevTools для отладки renderer process
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔧 [MAIN] Opening DevTools for data window');
-        dataWindow.webContents.openDevTools();
-      }
+      // DevTools disabled to prevent crashes during audio pipeline debugging  
+      // if (process.env.NODE_ENV === 'development') {
+      //   console.log('🔧 [MAIN] Opening DevTools for data window');
+      //   dataWindow.webContents.openDevTools();
+      // }
     }
   });
 
