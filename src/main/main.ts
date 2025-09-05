@@ -141,6 +141,10 @@ function setupIPC() {
   // Создать окно с данными
   ipcMain.handle('create-data-window', () => {
     createDataWindow();
+    // Уведомляем renderer о создании окна
+    if (controlPanelWindow) {
+      controlPanelWindow.webContents.send('window-created', 'data');
+    }
   });
 
   // Закрыть окно с данными
@@ -148,6 +152,10 @@ function setupIPC() {
     if (dataWindow) {
       dataWindow.close();
       dataWindow = null;
+      // Уведомляем renderer о закрытии окна
+      if (controlPanelWindow) {
+        controlPanelWindow.webContents.send('window-closed', 'data');
+      }
     }
   });
 
