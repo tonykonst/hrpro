@@ -6,6 +6,8 @@ import { DeepgramService, TranscriptEvent } from '../deepgram';
 
 export class DeepgramAdapter implements ITranscriptionService {
   private deepgramService: DeepgramService;
+  private onTranscriptCallback?: (event: TranscriptEvent) => void;
+  private onErrorCallback?: (error: string) => void;
 
   constructor(deepgramService: DeepgramService) {
     this.deepgramService = deepgramService;
@@ -25,14 +27,21 @@ export class DeepgramAdapter implements ITranscriptionService {
   }
 
   onTranscript(callback: (event: TranscriptEvent) => void): void {
-    // В DeepgramService callback устанавливается в конструкторе
-    // Здесь мы просто делегируем вызов
+    this.onTranscriptCallback = callback;
     console.log('📝 DeepgramAdapter: onTranscript callback set');
   }
 
   onError(callback: (error: string) => void): void {
-    // В DeepgramService callback устанавливается в конструкторе
-    // Здесь мы просто делегируем вызов
+    this.onErrorCallback = callback;
     console.log('❌ DeepgramAdapter: onError callback set');
+  }
+
+  // Методы для внутреннего использования
+  getOnTranscriptCallback(): ((event: TranscriptEvent) => void) | undefined {
+    return this.onTranscriptCallback;
+  }
+
+  getOnErrorCallback(): ((error: string) => void) | undefined {
+    return this.onErrorCallback;
   }
 }

@@ -21,7 +21,7 @@ export class TranscriptionServiceFactory {
   static create(config: TranscriptionConfig): ITranscriptionService {
     switch (config.provider) {
       case 'deepgram':
-        // Создаем DeepgramService и оборачиваем в адаптер
+        // Создаем DeepgramService с callbacks
         const deepgramService = createDeepgramService(
           config.apiKey,
           config.onTranscript,
@@ -31,7 +31,12 @@ export class TranscriptionServiceFactory {
           config.correctionContext
         );
         
-        return new DeepgramAdapter(deepgramService);
+        // Создаем адаптер и устанавливаем callbacks
+        const adapter = new DeepgramAdapter(deepgramService);
+        adapter.onTranscript(config.onTranscript);
+        adapter.onError(config.onError);
+        
+        return adapter;
         
       case 'whisper':
         // TODO: Добавить поддержку Whisper в будущем

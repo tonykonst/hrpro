@@ -33,7 +33,7 @@ export interface SegmentAnalysis {
 }
 
 export class PostEditorService {
-  private anthropic: Anthropic;
+  private anthropic: Anthropic | null;
   private config: PostEditorConfig;
   private context: CorrectionContext;
   private lastRequestTime: number = 0;
@@ -42,9 +42,23 @@ export class PostEditorService {
   constructor(config: PostEditorConfig, context: CorrectionContext) {
     this.config = config;
     this.context = context;
-    this.anthropic = new Anthropic({
-      apiKey: config.apiKey,
-    });
+    
+    // Проверяем, что API ключ есть
+    if (!config.apiKey || config.apiKey === 'your_claude_api_key_here') {
+      console.warn('⚠️ [POST-EDITOR] Claude API key not configured, post-editing will be disabled');
+      this.anthropic = null;
+      return;
+    }
+    
+    try {
+      this.anthropic = new Anthropic({
+        apiKey: config.apiKey,
+        dangerouslyAllowBrowser: true, // Разрешаем использование в Electron renderer
+      });
+    } catch (error) {
+      console.error('❌ [POST-EDITOR] Failed to initialize Anthropic:', error);
+      this.anthropic = null;
+    }
   }
 
   // Основная функция для проверки нужности коррекции
@@ -56,6 +70,11 @@ export class PostEditorService {
       language: this.detectLanguage(text),
       technicalTerms: this.extractTechnicalTerms(text)
     };
+
+    // Если Anthropic не инициализирован, возвращаем базовый анализ
+    if (!this.anthropic) {
+      return analysis;
+    }
 
     // Триггер 1: Низкая уверенность (более консервативный для быстрой речи)
     if (confidence < 0.7) {
@@ -117,6 +136,18 @@ export class PostEditorService {
         language: analysis.language,
         tech_terms: analysis.technicalTerms.length
       });
+
+      // Проверяем, что Anthropic инициализирован
+      if (!this.anthropic) {
+        console.warn('⚠️ [POST-EDITOR] Anthropic not initialized, skipping correction');
+        return {
+          originalText: text,
+          correctedText: text,
+          changes: [],
+          confidence: 0,
+          reasoning: 'Anthropic not initialized'
+        };
+      }
 
       const response = await Promise.race([
         this.anthropic.messages.create({

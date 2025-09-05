@@ -31,7 +31,7 @@ export interface ClaudeServiceConfig {
 }
 
 export class ClaudeAnalysisService {
-  private anthropic: Anthropic;
+  private anthropic: Anthropic | null;
   private systemPrompt: string;
   private config: ClaudeServiceConfig;
   private ragService?: RAGService;
@@ -39,9 +39,23 @@ export class ClaudeAnalysisService {
   constructor(config: ClaudeServiceConfig, ragService?: RAGService) {
     this.config = config;
     this.ragService = ragService;
-    this.anthropic = new Anthropic({
-      apiKey: config.apiKey,
-    });
+    
+    // Проверяем, что API ключ есть
+    if (!config.apiKey || config.apiKey === 'your_claude_api_key_here') {
+      console.warn('⚠️ [CLAUDE] Claude API key not configured, insights will be disabled');
+      this.anthropic = null;
+      return;
+    }
+    
+    try {
+      this.anthropic = new Anthropic({
+        apiKey: config.apiKey,
+        dangerouslyAllowBrowser: true, // Разрешаем использование в Electron renderer
+      });
+    } catch (error) {
+      console.error('❌ [CLAUDE] Failed to initialize Anthropic:', error);
+      this.anthropic = null;
+    }
 
     // System prompt based on requirements from hrpro.mdc
     this.systemPrompt = `You are an expert technical interviewer analyzing candidate responses in real-time.
@@ -104,6 +118,17 @@ RESPONSE FORMAT (strict JSON):
         entities: enhancedRequest.entities.length,
         ragContext: !!enhancedRequest.ragContext
       });
+
+      // Проверяем, что Anthropic инициализирован
+      if (!this.anthropic) {
+        console.warn('⚠️ [CLAUDE] Anthropic not initialized, skipping analysis');
+        return {
+          insights: [],
+          summary: 'Claude service not available',
+          confidence: 0,
+          timestamp: new Date().toISOString()
+        };
+      }
 
       const response = await this.anthropic.messages.create({
         model: this.config.model,
@@ -261,6 +286,19 @@ Generate a structured analysis focusing on:
 Respond with valid JSON only.`;
 
     try {
+      // Проверяем, что Anthropic инициализирован
+      if (!this.anthropic) {
+        console.warn('⚠️ [CLAUDE] Anthropic not initialized, skipping report generation');
+        return {
+          overallAssessment: 'Claude service not available',
+          technicalCompetency: 'N/A',
+          communicationClarity: 'N/A',
+          practicalExperience: 'N/A',
+          areasToExplore: [],
+          recommendations: ['Configure Claude API key to enable analysis']
+        };
+      }
+
       const response = await this.anthropic.messages.create({
         model: this.config.model,
         max_tokens: 1000, // Больше токенов для полного отчета

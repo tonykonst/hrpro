@@ -1,9 +1,16 @@
 import { app, BrowserWindow, globalShortcut, ipcMain, screen, desktopCapturer } from 'electron';
 import { join } from 'path';
 import * as path from 'path';
+import { config } from 'dotenv';
+
+// Загружаем переменные окружения из .env файла
+config();
 
 let controlPanelWindow: BrowserWindow | null = null;
 let dataWindow: BrowserWindow | null = null;
+
+// Флаг для отслеживания завершения приложения
+let isQuitting = false;
 
 // Очередь для данных, отправляемых до создания окна
 let pendingTranscriptData: any[] = [];
@@ -42,8 +49,14 @@ function createControlPanelWindow() {
   // Загружаем панель управления
   controlPanelWindow.loadURL('http://localhost:5173?window=control');
   
-  // Открываем DevTools в отдельном окне
-  controlPanelWindow.webContents.openDevTools({ mode: 'detach' });
+  // Открываем DevTools для отладки проблем с отображением текста
+  console.log('🔧 [MAIN] NODE_ENV:', process.env.NODE_ENV);
+  
+  // Ждем загрузки контента перед открытием DevTools
+  controlPanelWindow.webContents.once('did-finish-load', () => {
+    console.log('🔧 [MAIN] Opening DevTools for control panel');
+    controlPanelWindow?.webContents.openDevTools({ mode: 'detach' });
+  });
   
   controlPanelWindow.webContents.on('did-fail-load', () => {
     console.log('Failed to load Control Panel, retrying...');
@@ -130,7 +143,13 @@ function createDataWindow() {
     console.log('🚪 [MAIN] Data window close event triggered');
     console.log('🚪 [MAIN] Close event preventDefault available:', typeof event.preventDefault === 'function');
     
-    // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Предотвращаем закрытие окна
+    // Проверяем, не завершается ли приложение
+    if (isQuitting) {
+      console.log('🏁 [MAIN] App is quitting, allowing data window to close');
+      return; // Разрешаем закрытие при завершении приложения
+    }
+    
+    // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Предотвращаем закрытие окна только если приложение не завершается
     console.log('🛡️ [MAIN] Preventing data window close with preventDefault');
     event.preventDefault();
     
@@ -169,12 +188,7 @@ function createDataWindow() {
       dataWindow.show();
       dataWindow.focus();
       
-      // Включаем DevTools для отладки renderer process
-      // DevTools disabled to prevent crashes during audio pipeline debugging  
-      // if (process.env.NODE_ENV === 'development') {
-      //   console.log('🔧 [MAIN] Opening DevTools for data window');
-      //   dataWindow.webContents.openDevTools();
-      // }
+      // DevTools для data window отключены
     }
   });
 
@@ -380,14 +394,55 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  console.log('🚪 [APP] All windows closed');
+  // На macOS приложения обычно остаются активными даже когда все окна закрыты
+  // Но для нашего случая лучше завершить приложение полностью
+  console.log('🏁 [APP] Quitting application');
+  app.quit();
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  console.log('🏁 [APP] Before quit event triggered');
+  isQuitting = true;
+  
+  // Закрываем DevTools если открыты
+  if (controlPanelWindow && !controlPanelWindow.isDestroyed()) {
+    console.log('🔧 [APP] Closing control panel DevTools');
+    controlPanelWindow.webContents.closeDevTools();
+  }
+  
+  if (dataWindow && !dataWindow.isDestroyed()) {
+    console.log('🔧 [APP] Closing data window DevTools');
+    dataWindow.webContents.closeDevTools();
+  }
+  
   // Убираем все глобальные горячие клавиши
+  console.log('⌨️ [APP] Unregistering global shortcuts');
   globalShortcut.unregisterAll();
+  
+  // Принудительно закрываем все окна
+  console.log('🚪 [APP] Force closing all windows');
+  BrowserWindow.getAllWindows().forEach(window => {
+    if (!window.isDestroyed()) {
+      window.destroy();
+    }
+  });
+});
+
+// Добавляем обработчик will-quit для финальной очистки
+app.on('will-quit', (event) => {
+  console.log('🏁 [APP] Will quit event triggered');
+  
+  // Убеждаемся что все окна закрыты
+  const allWindows = BrowserWindow.getAllWindows();
+  if (allWindows.length > 0) {
+    console.log(`🚪 [APP] Found ${allWindows.length} windows still open, destroying them`);
+    allWindows.forEach(window => {
+      if (!window.isDestroyed()) {
+        window.destroy();
+      }
+    });
+  }
 });
 
 // Обработка ошибок
