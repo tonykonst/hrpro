@@ -7,9 +7,9 @@ let path: any;
 
 // Dynamic imports for Node.js modules (only in Electron main process)
 try {
-  if (typeof window !== 'undefined' && (window as any).require) {
-    fs = (window as any).require('fs');
-    path = (window as any).require('path');
+  if (typeof window !== 'undefined' && (window as any).electronAPI) {
+    // В безопасном режиме используем fallback
+    console.log('🔒 [TranscriptLogger] Running in secure mode, using fallback');
   } else if (typeof require !== 'undefined') {
     fs = require('fs');
     path = require('path');
@@ -333,7 +333,17 @@ let globalTranscriptLogger: TranscriptLogger | null = null;
 
 export const getTranscriptLogger = (): TranscriptLogger => {
   if (!globalTranscriptLogger) {
-    const logsDir = path.join(process.cwd(), 'transcript-logs');
+    // В безопасном режиме используем fallback директорию
+    let logsDir: string;
+    if (typeof window !== 'undefined' && (window as any).electronAPI) {
+      // В renderer процессе используем fallback
+      logsDir = 'transcript-logs';
+      console.log('🔒 [TranscriptLogger] Using fallback directory in secure mode');
+    } else if (path) {
+      logsDir = path.join(process.cwd(), 'transcript-logs');
+    } else {
+      logsDir = 'transcript-logs';
+    }
     globalTranscriptLogger = new TranscriptLogger(logsDir);
   }
   return globalTranscriptLogger;

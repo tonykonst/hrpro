@@ -10,6 +10,26 @@
 
 import { EventEmitter } from 'events';
 
+// Типы для electronAPI
+declare global {
+  interface Window {
+    electronAPI: {
+      createDataWindow: () => Promise<any>;
+      closeDataWindow: () => Promise<any>;
+      getConfig: () => Promise<any>;
+      sendTranscript: (data: any) => Promise<any>;
+      sendInsights: (data: any) => Promise<any>;
+      sendRecordingState: (data: any) => Promise<any>;
+      onTranscriptUpdate: (callback: (data: any) => void) => void;
+      onInsightsUpdate: (callback: (data: any) => void) => void;
+      onRecordingStateChange: (callback: (data: any) => void) => void;
+      onWindowCreated: (callback: (windowId: string) => void) => void;
+      onWindowClosed: (callback: (windowId: string) => void) => void;
+      removeAllListeners: (channel: string) => void;
+    };
+  }
+}
+
 export interface WindowState {
   isVisible: boolean;
   isRecording: boolean;
@@ -62,9 +82,10 @@ export class WindowManager extends EventEmitter {
       console.log('📱 [WindowManager] Creating data window...');
       
       // Отправляем запрос на создание окна в main процесс
-      if (window.require) {
-        const { ipcRenderer } = window.require('electron');
-        await ipcRenderer.invoke('create-data-window');
+      if (window.electronAPI) {
+        console.log('📡 [WindowManager] Using electronAPI to create data window');
+        const result = await window.electronAPI.createDataWindow();
+        console.log('📡 [WindowManager] Create data window result:', result);
         
         // Устанавливаем начальное состояние
         this.windowStates.set('data', {
@@ -75,6 +96,9 @@ export class WindowManager extends EventEmitter {
         
         this.emit('window-created', 'data');
         console.log('✅ [WindowManager] Data window created successfully');
+      } else {
+        console.error('❌ [WindowManager] electronAPI not available');
+        throw new Error('electronAPI not available');
       }
     } catch (error) {
       console.error('❌ [WindowManager] Failed to create data window:', error);
@@ -83,7 +107,7 @@ export class WindowManager extends EventEmitter {
   }
 
   /**
-   * Закрыть окно с данными
+   * Скрыть окно с данными (НЕ закрывать!)
    */
   public async closeDataWindow(): Promise<void> {
     try {
@@ -92,17 +116,21 @@ export class WindowManager extends EventEmitter {
         return;
       }
 
-      console.log('📱 [WindowManager] Closing data window...');
+      console.log('👁️ [WindowManager] Hiding data window...');
       
-      if (window.require) {
-        const { ipcRenderer } = window.require('electron');
-        await ipcRenderer.invoke('close-data-window');
+      if (window.electronAPI) {
+        console.log('📡 [WindowManager] Using electronAPI to hide data window');
+        await window.electronAPI.closeDataWindow(); // ← Теперь это скрывает окно!
         
-        this.windows.delete('data');
-        this.windowStates.delete('data');
+        // НЕ удаляем из windows - окно остается живым!
+        // this.windows.delete('data');
+        // this.windowStates.delete('data');
         
         this.emit('window-closed', 'data');
-        console.log('✅ [WindowManager] Data window closed successfully');
+        console.log('✅ [WindowManager] Data window hidden successfully');
+      } else {
+        console.error('❌ [WindowManager] electronAPI not available');
+        throw new Error('electronAPI not available');
       }
     } catch (error) {
       console.error('❌ [WindowManager] Failed to close data window:', error);
@@ -141,9 +169,10 @@ export class WindowManager extends EventEmitter {
         await this.createDataWindow();
       }
     } else {
-      // Останавливаем запись - закрываем окно
+      // Останавливаем запись - скрываем окно вместо закрытия
       if (this.windows.has('data')) {
-        await this.closeDataWindow();
+        console.log('📱 [WindowManager] Hiding data window instead of closing');
+        await this.closeDataWindow(); // ← Теперь это скрывает окно, а не закрывает!
       }
     }
   }
@@ -174,21 +203,23 @@ export class WindowManager extends EventEmitter {
    */
   private setupEventHandlers(): void {
     // Слушаем события от main процесса
-    if (window.require) {
-      const { ipcRenderer } = window.require('electron');
-      
+    if (window.electronAPI) {
       // Окно создано
-      ipcRenderer.on('window-created', (event: any, windowId: string) => {
+      const handleWindowCreated = (windowId: string) => {
         this.windows.set(windowId, { id: windowId });
         console.log(`📱 [WindowManager] Window ${windowId} registered`);
-      });
+      };
       
       // Окно закрыто
-      ipcRenderer.on('window-closed', (event: any, windowId: string) => {
+      const handleWindowClosed = (windowId: string) => {
         this.windows.delete(windowId);
         this.windowStates.delete(windowId);
         console.log(`📱 [WindowManager] Window ${windowId} unregistered`);
-      });
+      };
+      
+      // Регистрируем слушатели через electronAPI
+      window.electronAPI.onWindowCreated(handleWindowCreated);
+      window.electronAPI.onWindowClosed(handleWindowClosed);
     }
   }
 

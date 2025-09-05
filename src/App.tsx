@@ -14,11 +14,32 @@ import { PostEditorConfig, CorrectionContext } from "./services/post-editor";
 import { endCurrentSession } from "./services/transcript-logger";
 
 // Типы для IPC - теперь используется безопасный electronAPI
+declare global {
+  interface Window {
+    electronAPI: {
+      getConfig: () => Promise<any>;
+      sendTranscript: (data: any) => Promise<any>;
+      sendInsights: (data: any) => Promise<any>;
+      sendRecordingState: (data: any) => Promise<any>;
+      createDataWindow: () => Promise<any>;
+      closeDataWindow: () => Promise<any>;
+      onTranscriptUpdate: (callback: (data: any) => void) => void;
+      onInsightsUpdate: (callback: (data: any) => void) => void;
+      onRecordingStateChange: (callback: (data: any) => void) => void;
+      onWindowCreated: (callback: (windowId: string) => void) => void;
+      onWindowClosed: (callback: (windowId: string) => void) => void;
+      removeAllListeners: (channel: string) => void;
+    };
+  }
+}
 
 export function App() {
   // Определяем тип окна из URL параметров
   const urlParams = new URLSearchParams(window.location.search);
   const windowType = urlParams.get('window') || 'control'; // 'control' или 'data'
+  
+  // Логирование для отладки
+  console.log('🚀 [App] App component initialized:', { windowType, timestamp: new Date().toISOString() });
   
 
 
@@ -67,11 +88,25 @@ export function App() {
     insights,
     isRecording,
     onTranscriptUpdate: (data) => {
-      if (data.transcript !== undefined) setTranscript(data.transcript);
-      if (data.partialTranscript !== undefined) setPartialTranscript(data.partialTranscript);
+      console.log('📝 [App] onTranscriptUpdate called with:', data);
+      console.log('📝 [App] Current window type:', windowType);
+      if (data.transcript !== undefined) {
+        console.log('📝 [App] Setting transcript:', data.transcript);
+        setTranscript(data.transcript);
+      }
+      if (data.partialTranscript !== undefined) {
+        console.log('📝 [App] Setting partialTranscript:', data.partialTranscript);
+        setPartialTranscript(data.partialTranscript);
+      }
     },
-    onInsightsUpdate: (newInsights) => setInsights(newInsights),
-    onRecordingStateChange: (recordingState) => setIsRecording(recordingState)
+    onInsightsUpdate: (newInsights) => {
+      console.log('🤖 [App] onInsightsUpdate called with:', newInsights);
+      setInsights(newInsights);
+    },
+    onRecordingStateChange: (recordingState) => {
+      console.log('🎤 [App] onRecordingStateChange called with:', recordingState);
+      setIsRecording(recordingState);
+    }
   });
 
   // RAG system temporarily disabled
@@ -125,6 +160,9 @@ export function App() {
 
   const connectToDeepgram = async (): Promise<() => void> => {
     console.log('🔗 [DEEPGRAM] Starting Deepgram connection...');
+    
+    // Загружаем конфигурацию с переменными окружения из electronAPI
+    await configService.getConfigWithEnv();
     
     // Логируем конфигурацию в dev режиме
     if (configService.isDevelopment) {

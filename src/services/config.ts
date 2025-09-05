@@ -141,17 +141,19 @@ class ConfigService {
   }
 
   private getEnvVar(key: string, defaultValue: string): string {
-    // In Electron renderer process, environment variables are accessed differently
-    // Try process.env first, then window.process?.env as fallback
+    // Fallback для development режима (если process.env доступен)
     if (typeof process !== 'undefined' && process.env) {
       return process.env[key] || defaultValue;
     }
     
-    // Fallback for browser environment or when process.env is not available
+    // Fallback для browser environment
     if (typeof window !== 'undefined' && (window as any).process?.env) {
       return (window as any).process.env[key] || defaultValue;
     }
     
+    // В безопасном режиме Electron переменные окружения недоступны напрямую
+    // Они будут переданы через electronAPI.getConfig() асинхронно
+    console.warn(`⚠️ [CONFIG] Environment variable ${key} not available in secure mode, using default: ${defaultValue}`);
     return defaultValue;
   }
 
@@ -225,6 +227,39 @@ class ConfigService {
 
   get isDevelopment(): boolean {
     return this.config.isDevelopment;
+  }
+
+  /**
+   * Получить конфигурацию приложения
+   */
+  getConfig(): AppConfig {
+    return this.config;
+  }
+
+  /**
+   * Асинхронно получить конфигурацию с переменными окружения из electronAPI
+   */
+  async getConfigWithEnv(): Promise<AppConfig> {
+    // Если electronAPI доступен, получаем переменные окружения
+    if (typeof window !== 'undefined' && (window as any).electronAPI) {
+      try {
+        const configData = await (window as any).electronAPI.getConfig();
+        if (configData?.env) {
+          // Обновляем конфигурацию с реальными переменными окружения
+          this.config.api.deepgram.apiKey = configData.env.DEEPGRAM_API_KEY || this.config.api.deepgram.apiKey;
+          this.config.api.claude.apiKey = configData.env.CLAUDE_API_KEY || this.config.api.claude.apiKey;
+          this.config.api.openai.apiKey = configData.env.OPENAI_API_KEY || this.config.api.openai.apiKey;
+          this.config.api.postEditor.apiKey = configData.env.POST_EDITOR_API_KEY || this.config.api.postEditor.apiKey;
+          this.config.isDevelopment = configData.env.NODE_ENV === 'development';
+          
+          console.log('✅ [CONFIG] Environment variables loaded from electronAPI');
+        }
+      } catch (error) {
+        console.warn('⚠️ [CONFIG] Failed to load environment variables from electronAPI:', error);
+      }
+    }
+    
+    return this.config;
   }
 
   // Check if services are configured

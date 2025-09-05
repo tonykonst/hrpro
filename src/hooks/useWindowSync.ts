@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 
+// Типы для electronAPI уже объявлены в App.tsx
+
 /**
  * Хук для синхронизации данных между окнами через IPC
  * Обрабатывает отправку и получение данных между control и data окнами
@@ -9,16 +11,15 @@ export const useWindowSync = (windowType: 'control' | 'data') => {
   // Функция для отправки данных в окно транскрипции (только для control окна)
   const sendToDataWindow = (type: 'transcript' | 'insights' | 'recording-state', data: any) => {
     try {
-      if (window.require && windowType !== 'data') {
-        const { ipcRenderer } = window.require('electron');
+      if (window.electronAPI && windowType !== 'data') {
         console.log(`📤 [IPC] Sending ${type} to data window:`, data);
         
         if (type === 'transcript') {
-          ipcRenderer.invoke('send-transcript', data);
+          window.electronAPI.sendTranscript(data);
         } else if (type === 'insights') {
-          ipcRenderer.invoke('send-insights', data);
+          window.electronAPI.sendInsights(data);
         } else if (type === 'recording-state') {
-          ipcRenderer.invoke('send-recording-state', data.isRecording);
+          window.electronAPI.sendRecordingState(data.isRecording);
         }
       }
     } catch (error) {
@@ -29,9 +30,8 @@ export const useWindowSync = (windowType: 'control' | 'data') => {
   // Функция для создания окна с данными
   const createDataWindow = () => {
     try {
-      if (window.require && windowType !== 'data') {
-        const { ipcRenderer } = window.require('electron');
-        ipcRenderer.invoke('create-data-window');
+      if (window.electronAPI && windowType !== 'data') {
+        window.electronAPI.createDataWindow();
         console.log('📱 [IPC] Data window creation requested');
       }
     } catch (error) {
@@ -41,35 +41,34 @@ export const useWindowSync = (windowType: 'control' | 'data') => {
 
   // Слушатели событий для data окна
   useEffect(() => {
-    if (windowType === 'data' && window.require) {
-      const { ipcRenderer } = window.require('electron');
-      
+    if (windowType === 'data' && window.electronAPI) {
       // Слушаем обновления транскрипта
-      const handleTranscriptUpdate = (event: any, data: any) => {
+      const handleTranscriptUpdate = (data: any) => {
         console.log('📝 [DATA WINDOW] Transcript update received:', data);
         // Здесь будет логика обновления состояний
       };
 
       // Слушаем обновления инсайтов
-      const handleInsightsUpdate = (event: any, insights: any) => {
+      const handleInsightsUpdate = (insights: any) => {
         console.log('🤖 [DATA WINDOW] Insights update received:', insights);
         // Здесь будет логика обновления состояний
       };
 
       // Слушаем изменения состояния записи
-      const handleRecordingStateChange = (event: any, isRecordingState: boolean) => {
+      const handleRecordingStateChange = (isRecordingState: boolean) => {
         console.log('🎤 [DATA WINDOW] Recording state change:', isRecordingState);
         // Здесь будет логика обновления состояний
       };
 
-      ipcRenderer.on('transcript-update', handleTranscriptUpdate);
-      ipcRenderer.on('insights-update', handleInsightsUpdate);
-      ipcRenderer.on('recording-state-change', handleRecordingStateChange);
+      // Регистрируем слушатели через electronAPI
+      window.electronAPI.onTranscriptUpdate(handleTranscriptUpdate);
+      window.electronAPI.onInsightsUpdate(handleInsightsUpdate);
+      window.electronAPI.onRecordingStateChange(handleRecordingStateChange);
 
       return () => {
-        ipcRenderer.removeAllListeners('transcript-update');
-        ipcRenderer.removeAllListeners('insights-update');
-        ipcRenderer.removeAllListeners('recording-state-change');
+        window.electronAPI.removeAllListeners('transcript-update');
+        window.electronAPI.removeAllListeners('insights-update');
+        window.electronAPI.removeAllListeners('recording-state-change');
       };
     }
   }, [windowType]);

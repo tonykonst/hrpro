@@ -1,13 +1,6 @@
-/**
- * useDataSync - Хук для синхронизации данных между окнами
- * 
- * Предоставляет:
- * - Автоматическую отправку данных в окно с данными
- * - Слушание обновлений в окне с данными
- * - Синхронизацию состояний между окнами
- */
-
 import { useEffect, useCallback } from 'react';
+
+// Типы для electronAPI уже объявлены в App.tsx
 
 export interface DataSyncOptions {
   windowType: 'control' | 'data';
@@ -15,11 +8,17 @@ export interface DataSyncOptions {
   partialTranscript?: string;
   insights?: any[];
   isRecording?: boolean;
-  onTranscriptUpdate?: (data: { transcript?: string; partialTranscript?: string }) => void;
+  onTranscriptUpdate?: (data: any) => void;
   onInsightsUpdate?: (insights: any[]) => void;
   onRecordingStateChange?: (isRecording: boolean) => void;
 }
 
+/**
+ * УПРОЩЕННЫЙ хук для синхронизации данных между окнами
+ * - Автоматическую отправку данных в окно с данными
+ * - Слушание обновлений в окне с данными
+ * - Синхронизацию состояний между окнами
+ */
 export const useDataSync = (options: DataSyncOptions) => {
   const {
     windowType,
@@ -35,17 +34,29 @@ export const useDataSync = (options: DataSyncOptions) => {
   // Функция для отправки данных в окно с данными
   const sendToDataWindow = useCallback((type: 'transcript' | 'insights' | 'recording-state', data: any) => {
     try {
-      if (window.require && windowType !== 'data') {
-        const { ipcRenderer } = window.require('electron');
+      console.log(`📤 [DataSync] sendToDataWindow called:`, { type, data, windowType, hasElectronAPI: !!window.electronAPI });
+      
+      if (window.electronAPI && windowType !== 'data') {
         console.log(`📤 [DataSync] Sending ${type} to data window:`, data);
         
         if (type === 'transcript') {
-          ipcRenderer.invoke('send-transcript', data);
+          console.log('📤 [DataSync] Calling window.electronAPI.sendTranscript');
+          window.electronAPI.sendTranscript(data).then((result) => {
+            console.log('📤 [DataSync] sendTranscript result:', result);
+          }).catch((error) => {
+            console.error('📤 [DataSync] sendTranscript error:', error);
+          });
         } else if (type === 'insights') {
-          ipcRenderer.invoke('send-insights', data);
+          window.electronAPI.sendInsights(data);
         } else if (type === 'recording-state') {
-          ipcRenderer.invoke('send-recording-state', data.isRecording);
+          window.electronAPI.sendRecordingState(data.isRecording);
         }
+      } else {
+        console.log(`📤 [DataSync] Not sending ${type}:`, { 
+          hasElectronAPI: !!window.electronAPI, 
+          windowType, 
+          isDataWindow: windowType === 'data' 
+        });
       }
     } catch (error) {
       console.warn(`⚠️ [DataSync] Failed to send ${type}:`, error);
@@ -55,6 +66,7 @@ export const useDataSync = (options: DataSyncOptions) => {
   // Автоматическая отправка данных при изменении
   useEffect(() => {
     if (windowType === 'control' && transcript !== undefined) {
+      console.log('📤 [DataSync] Control window: transcript changed, sending to data window:', { transcript, partialTranscript });
       sendToDataWindow('transcript', { transcript, partialTranscript });
     }
   }, [transcript, partialTranscript, windowType, sendToDataWindow]);
@@ -71,43 +83,54 @@ export const useDataSync = (options: DataSyncOptions) => {
     }
   }, [isRecording, windowType, sendToDataWindow]);
 
-  // Слушатели событий для data окна
+  // Слушатели событий для data окна - УПРОЩЕННАЯ ВЕРСИЯ
   useEffect(() => {
-    if (windowType === 'data' && window.require) {
-      const { ipcRenderer } = window.require('electron');
+    console.log('📡 [DataSync] useEffect for data window listeners:', { windowType, hasElectronAPI: !!window.electronAPI, hasOnTranscriptUpdate: !!onTranscriptUpdate });
+    
+    if (windowType === 'data' && window.electronAPI) {
+      console.log('📡 [DataSync] Setting up listeners for data window');
       
+      let cleanupTranscript: (() => void) | undefined;
+      let cleanupInsights: (() => void) | undefined;
+      let cleanupRecording: (() => void) | undefined;
+
       // Слушаем обновления транскрипта
-      const handleTranscriptUpdate = (event: any, data: any) => {
-        console.log('📝 [DataSync] Transcript update received:', data);
-        if (onTranscriptUpdate) {
+      if (onTranscriptUpdate) {
+        console.log('📡 [DataSync] Registering onTranscriptUpdate listener');
+        const cleanup = window.electronAPI.onTranscriptUpdate((data: any) => {
+          console.log('📝 [DataSync] Transcript update received in data window:', data);
           onTranscriptUpdate(data);
-        }
-      };
+        });
+        cleanupTranscript = cleanup as (() => void) | undefined;
+        console.log('📡 [DataSync] onTranscriptUpdate listener registered, cleanup function:', !!cleanupTranscript);
+      } else {
+        console.log('📡 [DataSync] No onTranscriptUpdate callback provided');
+      }
 
       // Слушаем обновления инсайтов
-      const handleInsightsUpdate = (event: any, insights: any) => {
-        console.log('🤖 [DataSync] Insights update received:', insights);
-        if (onInsightsUpdate) {
+      if (onInsightsUpdate) {
+        const cleanup = window.electronAPI.onInsightsUpdate((insights: any) => {
+          console.log('🤖 [DataSync] Insights update received:', insights);
           onInsightsUpdate(insights || []);
-        }
-      };
+        });
+        cleanupInsights = cleanup as (() => void) | undefined;
+      }
 
       // Слушаем изменения состояния записи
-      const handleRecordingStateChange = (event: any, isRecordingState: boolean) => {
-        console.log('🎤 [DataSync] Recording state change:', isRecordingState);
-        if (onRecordingStateChange) {
+      if (onRecordingStateChange) {
+        const cleanup = window.electronAPI.onRecordingStateChange((isRecordingState: boolean) => {
+          console.log('🎤 [DataSync] Recording state change:', isRecordingState);
           onRecordingStateChange(isRecordingState);
-        }
-      };
+        });
+        cleanupRecording = cleanup as (() => void) | undefined;
+      }
 
-      ipcRenderer.on('transcript-update', handleTranscriptUpdate);
-      ipcRenderer.on('insights-update', handleInsightsUpdate);
-      ipcRenderer.on('recording-state-change', handleRecordingStateChange);
-
+      // Cleanup функция
       return () => {
-        ipcRenderer.removeAllListeners('transcript-update');
-        ipcRenderer.removeAllListeners('insights-update');
-        ipcRenderer.removeAllListeners('recording-state-change');
+        console.log('🧹 [DataSync] Cleaning up listeners');
+        if (cleanupTranscript) cleanupTranscript();
+        if (cleanupInsights) cleanupInsights();
+        if (cleanupRecording) cleanupRecording();
       };
     }
   }, [windowType, onTranscriptUpdate, onInsightsUpdate, onRecordingStateChange]);

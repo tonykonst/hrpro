@@ -9,7 +9,8 @@
     "noEmit": false
   },
   "include": [
-    "src/main/**/*"
+    "src/main/**/*",
+    "src/preload/**/*"
   ],
   "exclude": [
     "src/components/**/*",

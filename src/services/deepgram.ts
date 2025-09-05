@@ -172,8 +172,8 @@ export class DeepgramService {
             // Обновляем время последней активности для heartbeat
             this.lastActivityTime = Date.now();
             
-            if (data.channel?.alternatives?.[0]?.transcript) {
-              const transcript = data.channel.alternatives[0].transcript;
+            if (data.channel?.alternatives?.[0]?.transcript && data.channel.alternatives[0].transcript.trim()) {
+              const transcript = data.channel.alternatives[0].transcript.trim();
               const confidence = data.channel.alternatives[0].confidence || 0;
               const is_final = data.is_final || false;
               const latency = Date.now() - this.sessionStartTime;
@@ -210,15 +210,17 @@ export class DeepgramService {
                 segment_id: segmentId
               } as const;
 
-              // Логируем в файл
-              getTranscriptLogger().logTranscript({
-                timestamp: transcriptEvent.timestamp,
-                type: transcriptEvent.type,
-                text: transcript,
-                confidence,
-                segment_id: segmentId,
-                language: analysis.languageStats.language
-              });
+              // Логируем в файл (только если transcript не пустой)
+              if (transcript && transcript.trim()) {
+                getTranscriptLogger().logTranscript({
+                  timestamp: transcriptEvent.timestamp,
+                  type: transcriptEvent.type,
+                  text: transcript,
+                  confidence,
+                  segment_id: segmentId,
+                  language: analysis.languageStats.language
+                });
+              }
 
               // Отправляем оригинальный транскрипт
               this.onTranscript(transcriptEvent);
